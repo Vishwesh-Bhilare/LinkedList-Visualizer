@@ -1,39 +1,79 @@
-document.getElementById("visualizeBtn").addEventListener("click", () => {
+function visualizeCode() {
   const code = document.getElementById("codeInput").value;
-  const viz = document.getElementById("visualization");
-  viz.innerHTML = "";
+  const output = document.getElementById("visualizer");
+  output.innerHTML = "";
 
-  // Very simple parser: extract numbers passed to `new Node(x)`
-  const regex = /new\s+Node\s*\(\s*(\d+)\s*\)/g;
+  // Regex for node creation & linking
+  const nodeRegex = /(\w+)\s*=\s*new\s+Node\s*\(\s*(\d+)\s*\)/g;
+  const linkRegex = /(\w+)->next\s*=\s*(\w+);/g;
+  const nullRegex = /(\w+)->next\s*=\s*nullptr\s*;/g;
+
+  let nodes = {};   // store nodes { varName: {value, next} }
+  let edges = [];   // store connections [from, to]
+
+  // Step 1: Create nodes
   let match;
-  const values = [];
-
-  while ((match = regex.exec(code)) !== null) {
-    values.push(match[1]);
+  while ((match = nodeRegex.exec(code)) !== null) {
+    let varName = match[1];
+    let value = match[2];
+    nodes[varName] = { value, next: null };
   }
 
-  if (values.length === 0) {
-    viz.innerHTML = "<p>No nodes detected. Try code with <code>new Node(x)</code>.</p>";
-    return;
+  // Step 2: Handle links
+  while ((match = linkRegex.exec(code)) !== null) {
+    let from = match[1];
+    let to = match[2];
+    if (nodes[from] && nodes[to]) {
+      nodes[from].next = to;
+      edges.push([from, to]);
+    }
   }
 
-  values.forEach((val, i) => {
-    const node = document.createElement("div");
-    node.className = "node";
+  // Step 3: Handle nullptr assignments
+  while ((match = nullRegex.exec(code)) !== null) {
+    let from = match[1];
+    if (nodes[from]) {
+      nodes[from].next = "NULL";
+      edges.push([from, "NULL"]);
+    }
+  }
 
-    const box = document.createElement("div");
-    box.className = "box";
-    box.textContent = val;
+  // Step 4: Render linked list
+  renderList(nodes, edges, output);
+}
 
-    node.appendChild(box);
+function renderList(nodes, edges, container) {
+  const drawn = new Set();
 
-    if (i < values.length - 1) {
-      const arrow = document.createElement("div");
-      arrow.className = "arrow";
-      arrow.textContent = "→";
-      node.appendChild(arrow);
+  edges.forEach(([from, to]) => {
+    if (!drawn.has(from)) {
+      const nodeDiv = createNodeDiv(nodes[from].value);
+      container.appendChild(nodeDiv);
+      drawn.add(from);
     }
 
-    viz.appendChild(node);
+    // Draw arrow
+    const arrow = document.createElement("span");
+    arrow.className = "arrow";
+    arrow.textContent = "→";
+    container.appendChild(arrow);
+
+    if (to === "NULL") {
+      const nullDiv = createNodeDiv("NULL", true);
+      container.appendChild(nullDiv);
+    } else {
+      if (!drawn.has(to)) {
+        const nodeDiv = createNodeDiv(nodes[to].value);
+        container.appendChild(nodeDiv);
+        drawn.add(to);
+      }
+    }
   });
-});
+}
+
+function createNodeDiv(value, isNull = false) {
+  const div = document.createElement("div");
+  div.className = isNull ? "null-node" : "node";
+  div.textContent = value;
+  return div;
+}
