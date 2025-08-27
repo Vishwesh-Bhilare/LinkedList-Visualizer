@@ -1,79 +1,90 @@
-function visualizeCode() {
-  const code = document.getElementById("codeInput").value;
-  const output = document.getElementById("visualizer");
-  output.innerHTML = "";
-
-  // Regex for node creation & linking
-  const nodeRegex = /(\w+)\s*=\s*new\s+Node\s*\(\s*(\d+)\s*\)/g;
-  const linkRegex = /(\w+)->next\s*=\s*(\w+);/g;
-  const nullRegex = /(\w+)->next\s*=\s*nullptr\s*;/g;
-
-  let nodes = {};   // store nodes { varName: {value, next} }
-  let edges = [];   // store connections [from, to]
-
-  // Step 1: Create nodes
-  let match;
-  while ((match = nodeRegex.exec(code)) !== null) {
-    let varName = match[1];
-    let value = match[2];
-    nodes[varName] = { value, next: null };
-  }
-
-  // Step 2: Handle links
-  while ((match = linkRegex.exec(code)) !== null) {
-    let from = match[1];
-    let to = match[2];
-    if (nodes[from] && nodes[to]) {
-      nodes[from].next = to;
-      edges.push([from, to]);
+function parseGDBOutput(text) {
+    const nodes = [];
+    const lines = text.split('\n');
+    
+    for (const line of lines) {
+        // Look for patterns like: data=10 next=0x...
+        if (line.includes('data=') && line.includes('next=')) {
+            const dataMatch = line.match(/data=(\d+)/);
+            const nextMatch = line.match(/next=(0x[0-9a-f]+|0x0|nullptr)/);
+            
+            if (dataMatch && nextMatch) {
+                nodes.push({
+                    data: dataMatch[1],
+                    next: nextMatch[1]
+                });
+            }
+        }
+        
+        // Alternative pattern: NODE_0: data=10 next=0x...
+        else if (line.includes('NODE_')) {
+            const parts = line.split(':');
+            if (parts.length > 1) {
+                const info = parts[1].trim();
+                const data = info.match(/data=(\d+)/)?.[1];
+                const next = info.match(/next=(0x[0-9a-f]+|0x0|nullptr)/)?.[1];
+                
+                if (data && next) {
+                    nodes.push({ data, next });
+                }
+            }
+        }
     }
-  }
-
-  // Step 3: Handle nullptr assignments
-  while ((match = nullRegex.exec(code)) !== null) {
-    let from = match[1];
-    if (nodes[from]) {
-      nodes[from].next = "NULL";
-      edges.push([from, "NULL"]);
-    }
-  }
-
-  // Step 4: Render linked list
-  renderList(nodes, edges, output);
+    
+    return nodes;
 }
 
-function renderList(nodes, edges, container) {
-  const drawn = new Set();
-
-  edges.forEach(([from, to]) => {
-    if (!drawn.has(from)) {
-      const nodeDiv = createNodeDiv(nodes[from].value);
-      container.appendChild(nodeDiv);
-      drawn.add(from);
+function createVisualization(nodes) {
+    if (nodes.length === 0) {
+        return '<p>No linked list nodes found. Please check your GDB output format.</p>';
     }
-
-    // Draw arrow
-    const arrow = document.createElement("span");
-    arrow.className = "arrow";
-    arrow.textContent = "→";
-    container.appendChild(arrow);
-
-    if (to === "NULL") {
-      const nullDiv = createNodeDiv("NULL", true);
-      container.appendChild(nullDiv);
-    } else {
-      if (!drawn.has(to)) {
-        const nodeDiv = createNodeDiv(nodes[to].value);
-        container.appendChild(nodeDiv);
-        drawn.add(to);
-      }
-    }
-  });
+    
+    let html = '<div class="linked-list">';
+    html += '<div class="node"><div class="label">HEAD</div></div>';
+    html += '<div class="arrow">→</div>';
+    
+    nodes.forEach((node, index) => {
+        html += `
+            <div class="node">
+                <div class="data-box">${node.data}</div>
+                <div class="node-info">Node ${index}</div>
+            </div>
+        `;
+        
+        if (index < nodes.length - 1) {
+            html += '<div class="arrow">→</div>';
+        }
+    });
+    
+    html += '<div class="arrow">→</div>';
+    html += '<div class="null-box">NULL</div>';
+    html += '</div>';
+    
+    // Add node details
+    html += '<div class="node-details"><h3>Node Details:</h3><ul>';
+    nodes.forEach((node, index) => {
+        const isLast = index === nodes.length - 1;
+        html += `<li>Node ${index}: data = ${node.data}, next = ${isLast ? 'NULL' : '→ Node ' + (index + 1)}</li>`;
+    });
+    html += '</ul></div>';
+    
+    return html;
 }
 
-function createNodeDiv(value, isNull = false) {
-  const div = document.createElement("div");
-  div.className = isNull ? "null-node" : "node";
-  div.textContent = value;
-  return div;
+function visualize() {
+    const gdbOutput = document.getElementById('gdbInput').value;
+    const nodes = parseGDBOutput(gdbOutput);
+    const visualizationHTML = createVisualization(nodes);
+    
+    document.getElementById('visualization').innerHTML = visualizationHTML;
 }
+
+// Example GDB output for testing
+const exampleGDBOutput = `NODE_0: data=10 next=0x55a1b2a6aeb0
+NODE_1: data=20 next=0x55a1b2a6aec0
+NODE_2: data=30 next=0x55a1b2a6aed0
+NODE_3: data=40 next=0x55a1b2a6aee0
+NODE_4: data=50 next=0x0`;
+
+// Pre-fill with example
+document.getElementById('gdbInput').value = exampleGDBOutput;
