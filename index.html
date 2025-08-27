@@ -1,31 +1,23 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8">
-  <title>Linked List Visualizer</title>
-  <link rel="stylesheet" href="./style.css">
+    <title>Linked List Visualizer</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header>
-    <h1>Linked List Visualizer</h1>
-  </header>
+    <div class="container">
+        <h1>🔗 Linked List Visualizer</h1>
+        
+        <div class="input-section">
+            <textarea id="gdbInput" placeholder="Paste GDB output here..."></textarea>
+            <button onclick="visualize()">Visualize</button>
+        </div>
 
-  <main>
-    <section id="input-section">
-      <textarea id="codeInput" placeholder="Paste your C++ code here..."></textarea>
-      <button id="visualizeBtn">Visualize</button>
-    </section>
+        <div class="visualization" id="visualization">
+            <p>Visualization will appear here...</p>
+        </div>
+    </div>
 
-    <section id="output-section">
-      <h2>Visualization</h2>
-      <div id="visualization"></div>
-    </section>
-  </main>
-
-  <footer>
-    <p>Made with ❤️ for C++ learners</p>
-  </footer>
-
-  <script src="./script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
