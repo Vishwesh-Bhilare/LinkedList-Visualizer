@@ -147,3 +147,11 @@ button:hover {
     border-radius: 5px;
     border: 1px solid #ff6b6b;
 }
+
+.success {
+    color: #6bff97;
+    padding: 10px;
+    background: rgba(107, 255, 151, 0.1);
+    border-radius: 5px;
+    border: 1px solid #6bff97;
+}
