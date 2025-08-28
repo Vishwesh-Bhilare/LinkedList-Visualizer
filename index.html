@@ -20,16 +20,17 @@ struct Node {
 };
 
 void debug_point(Node* head) {
-    // Visualization hook
+    // Visualization hook - don't remove this function!
 }
 
 int main() {
+    // Create a sample linked list
     Node* head = new Node(10);
     head->next = new Node(20);
     head->next->next = new Node(30);
     head->next->next->next = new Node(40);
     
-    debug_point(head); // Visualize here
+    debug_point(head); // Visualize the linked list here
     
     return 0;
 }
@@ -38,7 +39,7 @@ int main() {
         </div>
 
         <div class="output-section">
-            <h3>Output:</h3>
+            <h3>Compilation Output:</h3>
             <div id="output"></div>
         </div>
 
