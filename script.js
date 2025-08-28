@@ -1,57 +1,95 @@
-// Use Judge0 API for compilation
-const API_URL = 'https://api.judge0.com/submissions';
-const API_KEY = ''; // Optional: get from judge0.com
+const RAPIDAPI_KEY = '373fb61f6fmsh3597c1cb250ac60p1076f0jsn2019b5dda2f9';
+const JUDGE0_URL = 'https://judge0-ce.p.rapidapi.com/submissions';
 
 async function compileAndVisualize() {
     const cppCode = document.getElementById('cppCode').value;
     const outputDiv = document.getElementById('output');
     const visualizationDiv = document.getElementById('visualization');
     
-    outputDiv.innerHTML = '<div class="loading">🔄 Compiling...</div>';
+    outputDiv.innerHTML = '<div class="loading">🔄 Compiling your code...</div>';
     visualizationDiv.innerHTML = '<div class="loading">🔄 Preparing visualization...</div>';
 
     try {
-        // Enhanced code with debugging output
+        // Enhance code with debugging output
         const enhancedCode = enhanceCodeWithDebugging(cppCode);
         
-        // Submit to compiler API
-        const response = await fetch(`${API_URL}?base64_encoded=false&wait=true`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                source_code: enhancedCode,
-                language_id: 54, // C++ language ID
-                compiler_options: '-g', // Enable debugging
-                stdin: '',
-                redirect_stderr_to_stdout: true
-            })
-        });
-
-        const data = await response.json();
+        // Submit to Judge0 API via RapidAPI
+        const submission = await submitToJudge0(enhancedCode);
         
-        if (data.stdout) {
-            outputDiv.textContent = data.stdout;
-            const nodes = parseOutput(data.stdout);
+        // Get the result
+        const result = await getSubmissionResult(submission.token);
+        
+        if (result.stdout) {
+            outputDiv.innerHTML = `<div class="success">✅ Compilation Successful!</div>
+                                  <pre>${result.stdout}</pre>`;
+            const nodes = parseOutput(result.stdout);
             visualizeLinkedList(nodes);
-        } else if (data.stderr) {
-            outputDiv.innerHTML = `<div class="error">❌ Compilation Error:\n${data.stderr}</div>`;
+        } else if (result.stderr) {
+            outputDiv.innerHTML = `<div class="error">❌ Compilation Error:</div>
+                                  <pre>${result.stderr}</pre>`;
+            visualizationDiv.innerHTML = '<div class="error">Visualization failed due to compilation errors</div>';
+        } else if (result.compile_output) {
+            outputDiv.innerHTML = `<div class="error">❌ Compilation Error:</div>
+                                  <pre>${result.compile_output}</pre>`;
+            visualizationDiv.innerHTML = '<div class="error">Visualization failed due to compilation errors</div>';
         } else {
-            outputDiv.innerHTML = '<div class="error">❌ No output received</div>';
+            outputDiv.innerHTML = '<div class="error">❌ No output received from compiler</div>';
+            visualizationDiv.innerHTML = '<div class="error">Visualization failed</div>';
         }
         
     } catch (error) {
-        outputDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+        outputDiv.innerHTML = `<div class="error">❌ API Error: ${error.message}</div>`;
         visualizationDiv.innerHTML = '<div class="error">Visualization failed</div>';
+        console.error('API Error:', error);
     }
 }
 
+async function submitToJudge0(code) {
+    const response = await fetch(JUDGE0_URL, {
+        method: 'POST',
+        headers: {
+            'X-RapidAPI-Key': RAPIDAPI_KEY,
+            'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            source_code: code,
+            language_id: 54, // C++ language ID
+            compiler_options: '-g -O0', // Enable debugging, disable optimizations
+            stdin: '',
+            redirect_stderr_to_stdout: true
+        })
+    });
+    
+    if (!response.ok) {
+        throw new Error(`API request failed: ${response.status}`);
+    }
+    
+    return await response.json();
+}
+
+async function getSubmissionResult(token) {
+    // Wait a bit for compilation to complete
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
+    const response = await fetch(`${JUDGE0_URL}/${token}`, {
+        method: 'GET',
+        headers: {
+            'X-RapidAPI-Key': RAPIDAPI_KEY,
+            'X-RapidAPI-Host': 'judge0-ce.p.rapidapi.com'
+        }
+    });
+    
+    if (!response.ok) {
+        throw new Error(`Failed to get result: ${response.status}`);
+    }
+    
+    return await response.json();
+}
+
 function enhanceCodeWithDebugging(originalCode) {
-    // Add debug output to the code
-    return `
-#include <iostream>
-#include <sstream>
+    return `#include <iostream>
+#include <cstdio>
 
 struct Node {
     int data;
@@ -59,24 +97,22 @@ struct Node {
     Node(int val) : data(val), next(nullptr) {}
 };
 
-void debug_point(Node* head, const std::string& label = "") {
+void debug_point(Node* head) {
     Node* current = head;
     int count = 0;
-    std::cout << "=== DEBUG OUTPUT ===\\n";
+    
+    // Output format that our parser understands
+    printf("=== DEBUG OUTPUT ===\\n");
     while (current != nullptr) {
-        std::cout << "NODE_" << count << ": data=" << current->data 
-                  << " next=" << current->next << "\\n";
+        printf("NODE_%d: data=%d next=%p\\n", count, current->data, current->next);
         current = current->next;
         count++;
     }
-    std::cout << "TOTAL_NODES: " << count << "\\n";
-    if (!label.empty()) {
-        std::cout << "LABEL: " << label << "\\n";
-    }
-    std::cout << "===================\\n";
+    printf("TOTAL_NODES: %d\\n", count);
+    printf("===================\\n");
 }
 
-${originalCode.replace('void debug_point(Node* head)', 'void debug_point(Node* head, const std::string& label = "")')}
+${originalCode}
 `;
 }
 
@@ -111,19 +147,21 @@ function visualizeLinkedList(nodes) {
     
     if (nodes.length === 0) {
         visualizationDiv.innerHTML = `
-            <div class="error">❌ No linked list nodes found.</div>
+            <div class="error">❌ No linked list nodes found in output.</div>
             <p>Make sure your code:</p>
             <ul>
-                <li>Includes Node struct with data and next</li>
-                <li>Calls debug_point(head) where you want to visualize</li>
-                <li>Creates a linked list properly</li>
+                <li>Includes the <code>debug_point(Node* head)</code> function call</li>
+                <li>Creates a linked list with the Node structure</li>
+                <li>Has proper memory allocation</li>
             </ul>
+            <p>Check the compilation output above for any errors.</p>
         `;
         return;
     }
     
     let html = `
-        <h3>📊 Linked List Visualization (${nodes.length} nodes)</h3>
+        <div class="success">✅ Found ${nodes.length} nodes in the linked list!</div>
+        <h3>📊 Linked List Visualization</h3>
         <div class="linked-list">
             <div class="node">
                 <div class="label">HEAD</div>
@@ -167,8 +205,15 @@ function visualizeLinkedList(nodes) {
     visualizationDiv.innerHTML = html;
 }
 
-// Example usage with a simple linked list
-const exampleCode = `
+// Pre-fill with example code
+const exampleCode = `#include <iostream>
+
+struct Node {
+    int data;
+    Node* next;
+    Node(int val) : data(val), next(nullptr) {}
+};
+
 void debug_point(Node* head) {
     // Visualization hook
 }
@@ -182,7 +227,6 @@ int main() {
     debug_point(head);
     
     return 0;
-}
-`;
+}`;
 
 document.getElementById('cppCode').value = exampleCode;
