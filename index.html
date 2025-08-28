@@ -1,16 +1,45 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Linked List Visualizer</title>
+    <title>C++ Linked List Visualizer</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <h1>🔗 Linked List Visualizer</h1>
+        <h1>🔗 C++ Linked List Visualizer</h1>
         
-        <div class="input-section">
-            <textarea id="gdbInput" placeholder="Paste GDB output here..."></textarea>
-            <button onclick="visualize()">Visualize</button>
+        <div class="editor-section">
+            <h3>Enter your C++ code:</h3>
+            <textarea id="cppCode" placeholder="Paste your C++ linked list code here...">
+#include <iostream>
+
+struct Node {
+    int data;
+    Node* next;
+    Node(int val) : data(val), next(nullptr) {}
+};
+
+void debug_point(Node* head) {
+    // Visualization hook
+}
+
+int main() {
+    Node* head = new Node(10);
+    head->next = new Node(20);
+    head->next->next = new Node(30);
+    head->next->next->next = new Node(40);
+    
+    debug_point(head); // Visualize here
+    
+    return 0;
+}
+            </textarea>
+            <button onclick="compileAndVisualize()">Compile & Visualize</button>
+        </div>
+
+        <div class="output-section">
+            <h3>Output:</h3>
+            <div id="output"></div>
         </div>
 
         <div class="visualization" id="visualization">
