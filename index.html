@@ -1,53 +1,518 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>C++ Linked List Visualizer</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <title>Linked List Visualizer — Drop-in for GitHub Pages</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    :root{
+      --bg:#071026; --panel:#071d2a; --accent:#39d0b3; --muted:#9fcad0; --card:#0b2230; --text:#e6f6f5;
+    }
+    body { background:var(--bg); color:var(--text); font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial; padding:18px; }
+    h1 { color:var(--accent); margin:0 0 8px 0; font-size:1.4rem; }
+    .desc { color:var(--muted); margin-bottom:12px; font-size:0.95rem; }
+    textarea { width:100%; min-height:320px; box-sizing:border-box; background:var(--panel); color:var(--text); border:1px solid #103040; padding:12px; border-radius:10px; font-family: monospace; font-size:13px; }
+    .controls { display:flex; gap:12px; align-items:center; margin-top:8px; flex-wrap:wrap; }
+    .controls button { background:var(--accent); color:#012; border:none; padding:10px 14px; border-radius:10px; font-weight:700; cursor:pointer; }
+    .controls input[type="number"] { width:110px; padding:6px; border-radius:8px; border:1px solid #123; background:#062; color:var(--text); }
+    #status { margin-top:10px; color:var(--muted); font-family: monospace; }
+    #visual { margin-top:16px; background:var(--card); padding:14px; border-radius:10px; border:1px solid #11303a; min-height:160px; }
+    .vars { margin-bottom:12px; }
+    .var-line { margin:8px 0; display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    .ptrName { color:var(--accent); min-width:160px; font-weight:700; }
+    .node { display:inline-block; min-width:62px; padding:10px 12px; border-radius:8px; background:#062233; border:1px solid #2bd2b0; margin-right:8px; text-align:center; box-shadow:0 6px 14px rgba(0,0,0,0.45); }
+    .node .id { font-size:11px; color:#9ee7d1; }
+    .node .val { font-size:14px; margin-top:6px; color:var(--text); font-weight:700; }
+    .arrow { color:#7ef0ce; font-weight:900; margin-right:8px; }
+    .stmt { color:#cfeff1; margin-bottom:8px; font-family: monospace; }
+    .footer { margin-top:10px; color:var(--muted); font-size:13px; }
+    .warning { color:#ffcc66; }
+    .small { font-size:0.9rem; color:var(--muted); }
+    a.link { color:var(--accent); }
+    @media (max-width:700px){ .ptrName{min-width:120px;} }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🔗 C++ Linked List Visualizer</h1>
-        
-        <div class="editor-section">
-            <h3>Enter your C++ code:</h3>
-            <textarea id="cppCode" placeholder="Paste your C++ linked list code here...">
-#include <iostream>
+  <h1>Linked List Visualizer (drop-in)</h1>
+  <div class="desc small">Paste a full C++ program (struct/class Node, functions, main). The simulator heuristically extracts and simulates linked-list operations (allocations with <code>new</code>, <code>->val</code>/<code>->data</code>, <code>->next</code>, loops, simple for-loops using integer variables, and function calls like <code>insertAtEnd(head, x)</code>).</div>
 
-struct Node {
-    int data;
-    Node* next;
-    Node(int val) : data(val), next(nullptr) {}
+  <textarea id="code">
+// Paste your full C++ program here
+#include <iostream>
+using namespace std;
+
+class Node{
+ public:
+   int val;
+   Node* next;
 };
 
-void debug_point(Node* head) {
-    // Visualization hook - don't remove this function!
+void display_linked_list(Node *head){
+    Node *current = head;
+    while (current -> next != nullptr){
+        cout << current -> val << endl;
+        current = current -> next;
+    }
 }
 
-int main() {
-    // Create a sample linked list
-    Node* head = new Node(10);
-    head->next = new Node(20);
-    head->next->next = new Node(30);
-    head->next->next->next = new Node(40);
-    
-    debug_point(head); // Visualize the linked list here
-    
+int main(){
+    Node *head = nullptr;
+    Node *tail = nullptr;
+    Node *temp = nullptr;
+    int n = 5;
+    for(int i = 0; i < n; i++){
+        temp = new Node;
+        temp -> next = nullptr;
+        if (head == nullptr){
+            head = temp;
+            tail = temp;
+        } else{
+            tail -> next = temp;
+            tail = temp;
+        }
+    }
+    display_linked_list(head);
     return 0;
 }
-            </textarea>
-            <button onclick="compileAndVisualize()">Compile & Visualize</button>
-        </div>
+  </textarea>
 
-        <div class="output-section">
-            <h3>Compilation Output:</h3>
-            <div id="output"></div>
-        </div>
+  <div class="controls">
+    <button id="runBtn">Run Visualization</button>
+    <div class="small">Delay (ms per step): <input id="delay" type="number" value="500" min="0" /></div>
+    <div class="small">Loop safety cap: <input id="safety" type="number" value="3000" min="10" /></div>
+    <div class="small">Tip: If your program uses a variable like <code>n</code> for a for-loop, ensure it's assigned a literal or simple integer expression.</div>
+  </div>
 
-        <div class="visualization" id="visualization">
-            <p>Visualization will appear here...</p>
-        </div>
-    </div>
+  <div id="status">Ready. Paste a C++ program and click <strong>Run Visualization</strong>.</div>
+  <div id="visual"></div>
 
-    <script src="script.js"></script>
+<script>
+/* ------------------------------
+   Lightweight but robust simulator
+   - Simulates Node allocations, ->val/data, ->next, function calls, for & while
+   - Heuristics designed to cover typical linked-list code patterns
+   ------------------------------ */
+
+/* JS Node model */
+class JSNode {
+  constructor(val = null) {
+    this.data = val;
+    this.next = null;
+    this._id = JSNode._nextId++;
+  }
+}
+JSNode._nextId = 1;
+
+/* Utilities */
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+function setStatus(text, warn=false) {
+  const s = document.getElementById('status');
+  s.innerHTML = warn ? `<span class="warning">${text}</span>` : text;
+}
+function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* --- Parsing helpers --- */
+
+// Find top-level function blocks and their headers (practical heuristic)
+function findTopLevelBlocks(code) {
+  const res = [];
+  let i = 0;
+  const len = code.length;
+  while (i < len) {
+    const idx = code.indexOf('(', i);
+    if (idx === -1) break;
+    // ensure it's not a template or cast by looking for a word before '('
+    const pre = code.slice(Math.max(0, idx-80), idx);
+    const nameMatch = pre.match(/([A-Za-z_]\w*)\s*$/);
+    if (!nameMatch) { i = idx + 1; continue; }
+    // find matching ) then next {
+    let rp = idx+1, pdepth = 1;
+    while (rp < len && pdepth > 0) {
+      if (code[rp] === '(') pdepth++;
+      else if (code[rp] === ')') pdepth--;
+      rp++;
+    }
+    if (pdepth !== 0) { i = idx+1; continue; }
+    const brace = code.indexOf('{', rp);
+    if (brace === -1) break;
+    // find matching brace
+    let j = brace+1, depth=1;
+    while (j < len && depth > 0) {
+      if (code[j] === '{') depth++;
+      else if (code[j] === '}') depth--;
+      j++;
+    }
+    if (depth !== 0) break;
+    // header starts from previous newline to '('
+    const headerStart = Math.max(0, code.lastIndexOf('\n', idx-1)+1);
+    const headerEnd = idx;
+    res.push({headerStart, headerEnd, startBrace: brace, endBrace: j-1});
+    i = j;
+  }
+  return res;
+}
+
+function parseFunctionsAndMain(fullCode) {
+  const funcs = {};
+  const blocks = findTopLevelBlocks(fullCode);
+  for (const b of blocks) {
+    const header = fullCode.slice(b.headerStart, b.headerEnd).trim();
+    // find function name by scanning left of '('
+    const beforeParenIdx = fullCode.lastIndexOf('(', b.headerEnd);
+    if (beforeParenIdx === -1) continue;
+    const nameMatch = fullCode.slice(Math.max(0, beforeParenIdx-60), beforeParenIdx).match(/([A-Za-z_]\w*)\s*$/);
+    const funcName = nameMatch ? nameMatch[1] : null;
+    if (!funcName) continue;
+    const paramStart = beforeParenIdx;
+    let paramEnd = paramStart+1, pdepth = 1;
+    while (paramEnd < fullCode.length && pdepth > 0) {
+      if (fullCode[paramEnd] === '(') pdepth++;
+      else if (fullCode[paramEnd] === ')') pdepth--;
+      paramEnd++;
+    }
+    if (pdepth !== 0) continue;
+    const paramStr = fullCode.slice(paramStart+1, paramEnd-1).trim();
+    const bodyStr = fullCode.slice(b.startBrace+1, b.endBrace).trim();
+    const rawLines = bodyStr.split(/\r?\n/).map(l => l.trim()).filter(l => l.length>0);
+    const params = paramStr.length===0 ? [] : paramStr.split(',').map(p => p.trim()).map(p => {
+      const ref = /\&/.test(p);
+      const nmMatch = p.match(/([A-Za-z_]\w*)\s*$/);
+      const name = nmMatch ? nmMatch[1] : null;
+      const typeMatch = p.match(/^(.+)\s+[A-Za-z_]\w*$/);
+      const type = typeMatch ? typeMatch[1].trim() : '';
+      return {raw:p, type, name, ref};
+    });
+    funcs[funcName] = {name: funcName, params, lines: rawLines, rawHeader: header};
+  }
+
+  // get main body
+  const mainMatch = fullCode.match(/int\s+main\s*\([\s\S]*?\)\s*\{([\s\S]*?)\}\s*$/m);
+  let mainBody = '';
+  if (mainMatch) mainBody = mainMatch[1];
+  else if (funcs['main']) mainBody = funcs['main'].lines.join('\n');
+  return {funcs, mainBody};
+}
+
+/* --- Simulator core --- */
+
+async function runVisualizer(fullCode) {
+  const delayMs = Math.max(0, parseInt(document.getElementById('delay').value) || 500);
+  const safetyCap = Math.max(10, parseInt(document.getElementById('safety').value) || 3000);
+
+  setStatus('Parsing code...');
+  const parsed = parseFunctionsAndMain(fullCode);
+  const functions = parsed.funcs;
+  const mainBody = parsed.mainBody;
+
+  setStatus('Preparing simulation...');
+  const mainLinesAll = mainBody.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0);
+
+  const globalVars = {}; // name -> JSNode|null or number
+  const varOrder = [];
+  JSNode._nextId = 1;
+
+  function registerGlobalVar(n) { if (!varOrder.includes(n)) varOrder.push(n); }
+
+  function visualize(currentStmt=null) {
+    const out = document.getElementById('visual');
+    out.innerHTML = '';
+    if (currentStmt) out.innerHTML += `<div class="stmt">Executing: <code>${escapeHtml(currentStmt)}</code></div>`;
+    const varsDiv = document.createElement('div'); varsDiv.className='vars';
+    for (const name of varOrder) {
+      if (!(name in globalVars)) continue;
+      const val = globalVars[name];
+      const line = document.createElement('div'); line.className='var-line';
+      const left = document.createElement('div'); left.className='ptrName'; left.textContent = `${name}  →`;
+      line.appendChild(left);
+      const right = document.createElement('div'); right.style.display='flex'; right.style.alignItems='center'; right.style.flexWrap='wrap';
+      if (val === null) {
+        const t = document.createElement('div'); t.textContent = 'nullptr'; t.style.color='#c6dede'; right.appendChild(t);
+      } else if (typeof val === 'number') {
+        const t = document.createElement('div'); t.textContent = String(val); t.style.color='#c6dede'; right.appendChild(t);
+      } else {
+        const seen = new Set(); let cur = val;
+        while (cur && !seen.has(cur._id)) {
+          seen.add(cur._id);
+          const box = document.createElement('div'); box.className='node';
+          box.innerHTML = `<div class="id">#${cur._id}</div><div class="val">${cur.data===null ? '•' : cur.data}</div>`;
+          right.appendChild(box);
+          if (cur.next) { const arr = document.createElement('div'); arr.className='arrow'; arr.textContent='→'; right.appendChild(arr); }
+          cur = cur.next;
+        }
+        if (cur !== null) {
+          const cyc = document.createElement('div'); cyc.textContent='↺ (cycle...)'; cyc.style.marginLeft='8px'; cyc.style.color='#ffd79a'; right.appendChild(cyc);
+        } else {
+          const end = document.createElement('div'); end.textContent='nullptr'; end.style.marginLeft='8px'; end.style.color='#c6dede'; right.appendChild(end);
+        }
+      }
+      line.appendChild(right);
+      varsDiv.appendChild(line);
+    }
+    out.appendChild(varsDiv);
+    const foot = document.createElement('div'); foot.className='footer';
+    foot.innerHTML = 'Nodes show <em>#id</em> and <em>data</em>. Empty data is •. Loop cap prevents infinite loops.';
+    out.appendChild(foot);
+  }
+
+  // resolver/assigner for a local function context
+  function makeResolver(globalVarsRef, localVarsRef, paramMap) {
+    return function resolve(name) {
+      if (name in localVarsRef) return localVarsRef[name];
+      if (paramMap && name in paramMap) {
+        const p = paramMap[name];
+        if (p.kind === 'alias') return globalVarsRef[p.name];
+        if (p.kind === 'copy') return p.node;
+        if (p.kind === 'value') return p.value;
+      }
+      if (name in globalVarsRef) return globalVarsRef[name];
+      return undefined;
+    };
+  }
+  function makeAssigner(globalVarsRef, localVarsRef, paramMapRef, varOrderRef) {
+    return function assign(name, value) {
+      if (name in localVarsRef) { localVarsRef[name] = value; return; }
+      if (paramMapRef && name in paramMapRef && paramMapRef[name].kind === 'alias') { globalVarsRef[paramMapRef[name].name] = value; if (!varOrderRef.includes(paramMapRef[name].name)) varOrderRef.push(paramMapRef[name].name); return; }
+      if (paramMapRef && name in paramMapRef && paramMapRef[name].kind === 'copy') { paramMapRef[name].node = value; return; }
+      globalVarsRef[name] = value; if (!varOrderRef.includes(name)) varOrderRef.push(name);
+    };
+  }
+
+  // parse an argument token to literal or resolved var
+  function parseArgToken(tok, resolver) {
+    tok = tok.trim();
+    if (/^-?\d+$/.test(tok)) return parseInt(tok);
+    if (/^(nullptr|NULL)$/.test(tok)) return null;
+    return resolver(tok);
+  }
+
+  // execute a single line in context
+  async function executeLine(line, globalVarsRef, localVarsRef, paramMapRef, functionsRef, resolver, assigner) {
+    if (!line) return;
+    if (/^\/\//.test(line)) return;
+    if (/^\b(return|cout|printf|std::cout|cerr)\b/.test(line)) return;
+
+    let m;
+    // Node* a = new Node();  with optional literal arg
+    m = line.match(/^Node\*\s+([A-Za-z_]\w*)\s*=\s*new\s+Node\s*\(?\s*(-?\d+)?\s*\)?\s*;?$/);
+    if (m) { const [, name, num] = m; localVarsRef[name] = new JSNode(num !== undefined ? parseInt(num) : null); return; }
+
+    // Node* a; declaration
+    m = line.match(/^Node\*\s+([A-Za-z_]\w*)\s*;?$/);
+    if (m) { const [, name] = m; localVarsRef[name] = localVarsRef[name] ?? null; return; }
+
+    // a = new Node();
+    m = line.match(/^([A-Za-z_]\w*)\s*=\s*new\s+Node\s*\(?\s*(-?\d+)?\s*\)?\s*;?$/);
+    if (m) { const [, name, num] = m; assigner(name, new JSNode(num !== undefined ? parseInt(num) : null)); return; }
+
+    // left = right OR left = nullptr
+    m = line.match(/^([A-Za-z_]\w*)\s*=\s*([A-Za-z_]\w*|nullptr|NULL)\s*;?$/);
+    if (m) { const [, left, right] = m; if (/^(nullptr|NULL)$/.test(right)) { assigner(left, null); } else { const rval = resolver(right); assigner(left, rval === undefined ? null : rval); } return; }
+
+    // left->next = new Node()
+    m = line.match(/^([A-Za-z_]\w*)\s*->\s*next\s*=\s*new\s+Node\s*\(?\s*(-?\d+)?\s*\)?\s*;?$/);
+    if (m) { const [, left, num] = m; const obj = resolver(left); if (obj) obj.next = new JSNode(num !== undefined ? parseInt(num) : null); return; }
+
+    // left->next = othervar or nullptr
+    m = line.match(/^([A-Za-z_]\w*)\s*->\s*next\s*=\s*([A-Za-z_]\w*|nullptr|NULL)\s*;?$/);
+    if (m) { const [, left, rhs] = m; const obj = resolver(left); if (!obj) return; if (/^(nullptr|NULL)$/.test(rhs)) obj.next = null; else obj.next = resolver(rhs) ?? null; return; }
+
+    // left->val = num  (val or data)
+    m = line.match(/^([A-Za-z_]\w*)\s*->\s*(?:val|data)\s*=\s*(-?\d+)\s*;?$/);
+    if (m) { const [, left, num] = m; const obj = resolver(left); if (!obj) return; obj.data = parseInt(num); return; }
+
+    // left = right->next;
+    m = line.match(/^([A-Za-z_]\w*)\s*=\s*([A-Za-z_]\w*)\s*->\s*next\s*;?$/);
+    if (m) { const [, left, right] = m; const r = resolver(right); assigner(left, r ? r.next : null); return; }
+
+    // support a = b->next->next (up to 2)
+    m = line.match(/^([A-Za-z_]\w*)\s*=\s*([A-Za-z_]\w*)\s*->\s*next\s*->\s*next\s*;?$/);
+    if (m) { const [, left, right] = m; const r = resolver(right); assigner(left, (r && r.next && r.next.next) ? r.next.next : null); return; }
+
+    // function call detection: name(arg1, arg2)
+    m = line.match(/^([A-Za-z_]\w*)\s*\(\s*([\s\S]*?)\)\s*;?$/);
+    if (m) { const [, fname, argstr] = m; if (functionsRef[fname]) { await executeFunctionByName(fname, argstr, globalVarsRef, localVarsRef, functionsRef); } return; }
+
+    // ignore other lines
+  }
+
+  // execute array of lines in a context
+  async function executeStatementList(lines, globalVarsRef, localVarsRef, paramMapRef, functionsRef) {
+    const resolver = makeResolver(globalVarsRef, localVarsRef, paramMapRef);
+    const assigner = makeAssigner(globalVarsRef, localVarsRef, paramMapRef, varOrder);
+    for (let i=0;i<lines.length;i++) {
+      const line = lines[i];
+      // while detection
+      const mw = line.match(/^while\s*\(\s*([A-Za-z_]\w*)(?:\s*(!=|==)\s*(nullptr|NULL))?\s*\)\s*{\s*$/);
+      if (mw) {
+        const varName = mw[1];
+        // collect body
+        const body = []; let brace=1; i++;
+        while (i < lines.length && brace > 0) {
+          const L = lines[i];
+          if (L.includes('{')) brace++;
+          if (L.includes('}')) brace--;
+          if (brace>0) body.push(L);
+          i++;
+        }
+        let loops=0;
+        while ((resolver(varName)!==null) && loops < safetyCap) {
+          await executeStatementList(body, globalVarsRef, localVarsRef, paramMapRef, functionsRef);
+          loops++;
+        }
+        if (loops >= safetyCap) { setStatus('Loop safety cap reached (possible infinite loop).', true); return; }
+        continue;
+      }
+
+      // if detection (simple var ==/!= nullptr)
+      const mif = line.match(/^if\s*\(\s*([A-Za-z_]\w*)\s*(==|!=)\s*(nullptr|NULL)\s*\)\s*{\s*$/);
+      if (mif) {
+        const varName = mif[1], op = mif[2], rhs = mif[3];
+        const body = []; let brace=1; i++;
+        while (i < lines.length && brace>0) {
+          const L=lines[i];
+          if (L.includes('{')) brace++;
+          if (L.includes('}')) brace--;
+          if (brace>0) body.push(L);
+          i++;
+        }
+        const val = resolver(varName);
+        const cond = (op==='!=') ? (val !== null) : (val === null);
+        if (cond) await executeStatementList(body, globalVarsRef, localVarsRef, paramMapRef, functionsRef);
+        continue;
+      }
+
+      // for-loop detection: try to expand if simple integer bounds or var known in globalVars
+      const mf = lines[i].match(/^for\s*\(\s*(?:int\s+)?([A-Za-z_]\w*)\s*=\s*([A-Za-z_]\w*|-?\d+)\s*;\s*\1\s*<\s*([A-Za-z_]\w*|-?\d+)\s*;\s*\1\+\+\s*\)\s*{\s*$/);
+      if (mf) {
+        const iterVar = mf[1], startTok = mf[2], endTok = mf[3];
+        // resolve start/end if possible
+        let start = null, end = null;
+        if (/^-?\d+$/.test(startTok)) start = parseInt(startTok);
+        else if (startTok in globalVars && typeof globalVars[startTok] === 'number') start = globalVars[startTok];
+        if (/^-?\d+$/.test(endTok)) end = parseInt(endTok);
+        else if (endTok in globalVars && typeof globalVars[endTok] === 'number') end = globalVars[endTok];
+        // collect body
+        const body = []; let brace=1; i++;
+        while (i < lines.length && brace>0) {
+          const L=lines[i];
+          if (L.includes('{')) brace++;
+          if (L.includes('}')) brace--;
+          if (brace>0) body.push(L);
+          i++;
+        }
+        if (start !== null && end !== null) {
+          for (let k=start;k<end;k++) {
+            // simple textual substitution of iterVar with literal k in each body line (works for common patterns)
+            for (const bl of body) {
+              const replaced = bl.replace(new RegExp('\\b'+iterVar+'\\b','g'), String(k));
+              await executeLine(replaced, globalVarsRef, localVarsRef, paramMapRef, functionsRef, resolver, assigner);
+              visualize(replaced);
+              await sleep(delayMs);
+            }
+          }
+        } else {
+          // can't expand — try to run body once (best-effort) to avoid hang
+          for (const bl of body) {
+            await executeLine(bl, globalVarsRef, localVarsRef, paramMapRef, functionsRef, resolver, assigner);
+            visualize(bl);
+            await sleep(delayMs);
+          }
+        }
+        continue;
+      }
+
+      // normal single-line
+      await executeLine(line, globalVarsRef, localVarsRef, paramMapRef, functionsRef, resolver, assigner);
+      visualize(line);
+      await sleep(delayMs);
+    }
+  } // end executeStatementList
+
+  // Execute named function: prepare paramMap and localVars then run body
+  async function executeFunctionByName(fname, argstr, globalVarsRef, callerLocalVars, functionsRef) {
+    const f = functionsRef[fname]; if (!f) return;
+    const rawArgs = argstr.trim().length===0 ? [] : splitArgs(argstr);
+    const paramMap = {};
+    for (let i=0;i<f.params.length;i++) {
+      const p = f.params[i]; const argTok = rawArgs[i] ? rawArgs[i].trim() : undefined;
+      if (p.type && p.type.includes('Node') && p.ref) {
+        if (!argTok) { paramMap[p.name] = {kind:'alias', name:p.name}; }
+        else if (/^(nullptr|NULL)$/.test(argTok)) { globalVarsRef[p.name] = null; paramMap[p.name] = {kind:'alias', name:p.name}; registerGlobalVar(p.name); }
+        else if (/^[A-Za-z_]\w*$/.test(argTok)) { paramMap[p.name] = {kind:'alias', name: argTok}; registerGlobalVar(argTok); }
+        else { const tmp = `_tmp_${p.name}_${Math.floor(Math.random()*10000)}`; globalVarsRef[tmp] = null; paramMap[p.name] = {kind:'alias', name:tmp}; registerGlobalVar(tmp); }
+      } else if (p.type && p.type.includes('Node')) {
+        if (!argTok) paramMap[p.name] = {kind:'copy', node:null};
+        else if (/^[A-Za-z_]\w*$/.test(argTok)) paramMap[p.name] = {kind:'copy', node: globalVarsRef[argTok] ?? null};
+        else if (/^(nullptr|NULL)$/.test(argTok)) paramMap[p.name] = {kind:'copy', node:null};
+        else paramMap[p.name] = {kind:'copy', node:null};
+      } else {
+        if (!argTok) paramMap[p.name] = {kind:'value', value:null};
+        else if (/^-?\d+$/.test(argTok)) paramMap[p.name] = {kind:'value', value: parseInt(argTok)};
+        else if (/^[A-Za-z_]\w*$/.test(argTok)) paramMap[p.name] = {kind:'value', value: globalVarsRef[argTok]};
+        else paramMap[p.name] = {kind:'value', value:null};
+      }
+    }
+    const localVars = {};
+    await executeStatementList(f.lines, globalVarsRef, localVars, paramMap, functionsRef);
+  }
+
+  function splitArgs(s) {
+    const parts=[]; let cur='', depth=0;
+    for (let ch of s) {
+      if (ch==='(') { depth++; cur+=ch; }
+      else if (ch===')') { depth--; cur+=ch; }
+      else if (ch===',' && depth===0) { parts.push(cur.trim()); cur=''; }
+      else cur+=ch;
+    }
+    if (cur.trim()) parts.push(cur.trim());
+    return parts;
+  }
+
+  // Pre-scan main lines for integer variable initializations like: int n = 5;
+  for (const l of mainLinesAll) {
+    const mint = l.match(/^int\s+([A-Za-z_]\w*)\s*=\s*(-?\d+)\s*;?$/);
+    if (mint) { const [, name, num] = mint; globalVars[name] = parseInt(num); registerGlobalVar(name); }
+    // Node* var = nullptr or Node* var;
+    const mnode = l.match(/^Node\*\s+([A-Za-z_]\w*)\s*(=\s*(.*))?;?$/);
+    if (mnode) {
+      const name = mnode[1]; registerGlobalVar(name);
+      if (mnode[3]) {
+        const rhs = mnode[3].trim();
+        if (/^(nullptr|NULL)$/.test(rhs)) globalVars[name] = null;
+        else if (/new\s+Node/.test(rhs)) {
+          const mv = rhs.match(/new\s+Node\s*\(?\s*(-?\d+)?\s*\)?/);
+          globalVars[name] = new JSNode(mv && mv[1] ? parseInt(mv[1]) : null);
+        } else if (/^[A-Za-z_]\w*$/.test(rhs)) globalVars[name] = globalVars[rhs] ?? null;
+        else globalVars[name] = null;
+      } else globalVars[name] = null;
+    }
+  }
+
+  // Also register variable names that appear as bare assignments so they show up
+  for (const l of mainLinesAll) {
+    const mass = l.match(/^([A-Za-z_]\w*)\s*=/);
+    if (mass) registerGlobalVar(mass[1]);
+  }
+
+  // Run main body (top-level lines)
+  setStatus('Running simulation...');
+  visualize('start');
+  try {
+    await executeStatementList(mainLinesAll, globalVars, {}, null, functions);
+    setStatus('Execution finished.');
+  } catch (e) {
+    setStatus('Error during simulation: ' + String(e), true);
+  }
+  visualize('end');
+}
+
+/* Button wiring */
+document.getElementById('runBtn').addEventListener('click', async () => {
+  const code = document.getElementById('code').value;
+  document.getElementById('visual').innerHTML = '';
+  await runVisualizer(code);
+});
+
+</script>
 </body>
 </html>
